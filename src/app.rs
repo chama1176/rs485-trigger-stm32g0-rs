@@ -1,4 +1,4 @@
-use crate::{indicator::Indicator};
+use crate::indicator::Indicator;
 
 pub struct App<T0, T1>
 where
@@ -14,14 +14,8 @@ where
     T0: Indicator,
     T1: Indicator,
 {
-    pub fn new(
-        led0: T0,
-        led1: T1,
-    ) -> Self {
-        Self {
-            led0,
-            led1,
-        }
+    pub fn new(led0: T0, led1: T1) -> Self {
+        Self { led0, led1 }
     }
     pub fn periodic_task(&self) {
         self.led0.toggle();

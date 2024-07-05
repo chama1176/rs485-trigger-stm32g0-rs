@@ -20,181 +20,179 @@ pub fn init_g_peripheral(perip: Peripherals) {
     free(|cs| G_PERIPHERAL.borrow(cs).replace(Some(perip)));
 }
 
-// pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
-//     perip.RCC.cr.modify(|_, w| w.hsebyp().bypassed());
-//     perip.RCC.cr.modify(|_, w| w.hseon().on());
-//     while perip.RCC.cr.read().hserdy().is_not_ready() {}
+pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
+    perip.RCC.cr.modify(|_, w| w.hsebyp().set_bit());
+    perip.RCC.cr.modify(|_, w| w.hseon().set_bit());
+    while perip.RCC.cr.read().hserdy().bit_is_clear() {}
 
-//     // Disable the PLL
-//     perip.RCC.cr.modify(|_, w| w.pllon().off());
-//     // Wait until PLL is fully stopped
-//     while perip.RCC.cr.read().pllrdy().is_ready() {}
-//     perip.RCC.pllcfgr.modify(|_, w| w.pllsrc().hse());
-//     perip.RCC.pllcfgr.modify(|_, w| w.pllm().div12());
-//     // perip.RCC.pllcfgr.modify(|_, w| w.plln().div85());
-//     perip.RCC.pllcfgr.modify(|_, w| w.plln().div70());
-//     perip.RCC.pllcfgr.modify(|_, w| w.pllr().div2());
+    // Disable the PLL
+    perip.RCC.cr.modify(|_, w| w.pllon().clear_bit());
+    // Wait until PLL is fully stopped
+    while perip.RCC.cr.read().pllrdy().bit_is_set() {}
+    perip
+        .RCC
+        .pllsyscfgr
+        .modify(|_, w| unsafe { w.pllsrc().bits(0b11) }); // HSE
+    perip
+        .RCC
+        .pllsyscfgr
+        .modify(|_, w| unsafe { w.pllm().bits(0b011) }); // div4
+    perip
+        .RCC
+        .pllsyscfgr
+        .modify(|_, w| unsafe { w.plln().bits(16) }); // div16
+    perip
+        .RCC
+        .pllsyscfgr
+        .modify(|_, w| unsafe { w.pllr().bits(0b010) }); // div3
 
-//     perip.RCC.cr.modify(|_, w| w.pllon().on());
-//     while perip.RCC.cr.read().pllrdy().is_not_ready() {}
-//     perip.RCC.pllcfgr.modify(|_, w| w.pllren().set_bit());
+    perip.RCC.cr.modify(|_, w| w.pllon().set_bit());
+    while perip.RCC.cr.read().pllrdy().bit_is_clear() {}
+    perip.RCC.pllsyscfgr.modify(|_, w| w.pllren().set_bit());
 
-//     perip
-//         .FLASH
-//         .acr
-//         .modify(|_, w| unsafe { w.latency().bits(4) });
-//     while perip.FLASH.acr.read().latency().bits() != 4 {
-//         defmt::info!("latency bit: {}", perip.FLASH.acr.read().latency().bits());
-//     }
+    perip
+        .FLASH
+        .acr
+        .modify(|_, w| unsafe { w.latency().bits(4) });
+    while perip.FLASH.acr.read().latency().bits() != 4 {
+        defmt::info!("latency bit: {}", perip.FLASH.acr.read().latency().bits());
+    }
 
-//     perip.RCC.cfgr.modify(|_, w| w.sw().pll());
-//     // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
-//     defmt::debug!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
-//     while !perip.RCC.cfgr.read().sw().is_pll() {}
-//     while !perip.RCC.cfgr.read().sws().is_pll() {
-//         defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
-//         defmt::info!("sws bit: {}", perip.RCC.cfgr.read().sws().bits());
-//     }
-//     // while !perip.RCC.cfgr.read().sws().is_hse() {}
+    perip.RCC.cfgr.modify(|_, w| unsafe { w.sw().bits(0b010) }); // PLL
+                                                                 // perip.RCC.cfgr.modify(|_, w| w.sw().hse());
+    defmt::debug!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
+    while !(perip.RCC.cfgr.read().sw().bits() == 0b010) {}
+    while !(perip.RCC.cfgr.read().sws().bits() == 0b010) {
+        defmt::info!("sw bit: {}", perip.RCC.cfgr.read().sw().bits());
+        defmt::info!("sws bit: {}", perip.RCC.cfgr.read().sws().bits());
+    }
+    // while !perip.RCC.cfgr.read().sws().is_hse() {}
 
-//     perip.RCC.apb1enr1.modify(|_, w| w.tim3en().enabled());
-//     perip.RCC.apb1enr1.modify(|_, w| w.tim6en().enabled());
+    perip.RCC.apbenr1.modify(|_, w| w.tim3en().set_bit());
 
-//     let tim3 = &perip.TIM3;
-//     // tim3.psc.modify(|_, w| unsafe { w.bits(170 - 1) });
-//     tim3.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) }); // 14_000?
-//                                                            // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
-//     tim3.dier.modify(|_, w| w.uie().set_bit());
-//     tim3.cr1.modify(|_, w| w.cen().set_bit());
+    let tim3 = &perip.TIM3;
+    tim3.psc.modify(|_, w| unsafe { w.bits(48_000 - 1) });
+                                                           // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
+    tim3.dier.modify(|_, w| w.uie().set_bit());
+    tim3.cr1.modify(|_, w| w.cen().set_bit());
 
-//     let tim6 = &perip.TIM6;
-//     tim6.psc.modify(|_, w| unsafe { w.bits(15_000 - 1) }); // 14_000?
-//     tim6.arr.modify(|_, w| unsafe { w.bits(1000 - 1) }); // 1kHz
-//     tim6.dier.modify(|_, w| w.uie().set_bit());
-//     tim6.cr2.modify(|_, w| unsafe { w.mms().bits(0b010) });
-
-//     // 割り込み設定
-//     unsafe {
-//         core_perip.NVIC.set_priority(Interrupt::USART1, 0);
-//         NVIC::unmask(Interrupt::USART1);
-//     }
-
-// }
-
+    // 割り込み設定
+    unsafe {
+        core_perip.NVIC.set_priority(Interrupt::TIM3, 0);
+        NVIC::unmask(Interrupt::TIM3);
+    }
+}
 
 pub struct Led0 {}
 
 impl Indicator for Led0 {
     fn on(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         gpioc.bsrr.write(|w| w.bs13().set());
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.bs4().set());
+            }
+        });
     }
     fn off(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         gpioc.bsrr.write(|w| w.br13().reset());
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.br4().reset());
+            }
+        });
     }
     fn toggle(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         if gpioc.odr.read().odr13().is_low() {
-        //             gpioc.bsrr.write(|w| w.bs13().set());
-        //         } else {
-        //             gpioc.bsrr.write(|w| w.br13().reset());
-        //         }
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                if gpioa.odr.read().odr4().is_low() {
+                    gpioa.bsrr.write(|w| w.bs4().set());
+                } else {
+                    gpioa.bsrr.write(|w| w.br4().reset());
+                }
+            }
+        });
     }
 }
 
-// impl Led0 {
-//     pub fn new() -> Self {
-//         Self {}
-//     }
+impl Led0 {
+    pub fn new() -> Self {
+        Self {}
+    }
 
-//     pub fn init(&self) {
-//         free(|cs| {
-//             match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-//                 None => (),
-//                 Some(perip) => {
-//                     // GPIOポートの電源投入(クロックの有効化)
-//                     perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
-
-//                     // gpioモード変更
-//                     let gpioc = &perip.GPIOC;
-//                     gpioc.moder.modify(|_, w| w.moder13().output());
-//                 }
-//             }
-//         });
-//     }
-// }
+    pub fn init(&self) {
+        free(|cs| {
+            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+                None => (),
+                Some(perip) => {
+                    // GPIOポートの電源投入(クロックの有効化)
+                    perip.RCC.iopenr.modify(|_, w| w.iopaen().set_bit());
+                    // gpioモード変更
+                    let gpioa = &perip.GPIOA;
+                    gpioa.moder.modify(|_, w| w.moder4().output());
+                }
+            }
+        });
+    }
+}
 
 pub struct Led1 {}
 
 impl Indicator for Led1 {
     fn on(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         gpioc.bsrr.write(|w| w.bs14().set());
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.bs5().set());
+            }
+        });
     }
     fn off(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         gpioc.bsrr.write(|w| w.br14().reset());
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.br5().reset());
+            }
+        });
     }
     fn toggle(&self) {
-        // free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        //     None => (),
-        //     Some(perip) => {
-        //         let gpioc = &perip.GPIOC;
-        //         if gpioc.odr.read().odr14().is_low() {
-        //             gpioc.bsrr.write(|w| w.bs14().set());
-        //         } else {
-        //             gpioc.bsrr.write(|w| w.br14().reset());
-        //         }
-        //     }
-        // });
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                if gpioa.odr.read().odr5().is_low() {
+                    gpioa.bsrr.write(|w| w.bs5().set());
+                } else {
+                    gpioa.bsrr.write(|w| w.br5().reset());
+                }
+            }
+        });
     }
 }
 
-// impl Led1 {
-//     pub fn new() -> Self {
-//         Self {}
-//     }
+impl Led1 {
+    pub fn new() -> Self {
+        Self {}
+    }
 
-//     pub fn init(&self) {
-//         free(|cs| {
-//             match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-//                 None => (),
-//                 Some(perip) => {
-//                     // GPIOポートの電源投入(クロックの有効化)
-//                     perip.RCC.ahb2enr.modify(|_, w| w.gpiocen().set_bit());
-
-//                     // gpioモード変更
-//                     let gpioc = &perip.GPIOC;
-//                     gpioc.moder.modify(|_, w| w.moder14().output());
-//                 }
-//             }
-//         });
-//     }
-// }
-
+    pub fn init(&self) {
+        free(|cs| {
+            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+                None => (),
+                Some(perip) => {
+                    // GPIOポートの電源投入(クロックの有効化)
+                    perip.RCC.iopenr.modify(|_, w| w.iopaen().set_bit());
+                    // gpioモード変更
+                    let gpioa = &perip.GPIOA;
+                    gpioa.moder.modify(|_, w| w.moder5().output());
+                }
+            }
+        });
+    }
+}
