@@ -42,8 +42,10 @@ fn main() -> ! {
 
     let led0 = rs485_trigger_stm32g0::Led0::new();
     led0.init();
+    led0.off();
     let led1 = rs485_trigger_stm32g0::Led1::new();
     led1.init();
+    led1.off();
 
     // let clock: rs485_trigger_stm32g0::LocalClock = rs485_trigger_stm32g0::LocalClock::new();
     // clock.init();
@@ -81,8 +83,10 @@ fn main() -> ! {
             },
         );
 
-        if t.wrapping_sub(prev) > 50 {
-
+        if t.wrapping_sub(prev) > 500 {
+            defmt::info!("t: {}", t);
+            defmt::info!("prev: {}", prev);
+    
             defmt::error!("error from defmt");
             defmt::warn!("warn from defmt");
             defmt::info!("info from defmt");

@@ -71,9 +71,10 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     perip.RCC.apbenr1.modify(|_, w| w.tim3en().set_bit());
 
     let tim3 = &perip.TIM3;
-    tim3.psc.modify(|_, w| unsafe { w.bits(48_000 - 1) });
-                                                           // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
-    tim3.dier.modify(|_, w| w.uie().set_bit());
+    tim3.psc.modify(|_, w| unsafe { w.bits(64_000 - 1) });  // 1kHz
+    // tim3.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
+
+    // tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
     // 割り込み設定
@@ -91,7 +92,7 @@ impl Indicator for Led0 {
             None => (),
             Some(perip) => {
                 let gpioa = &perip.GPIOA;
-                gpioa.bsrr.write(|w| w.bs4().set());
+                gpioa.bsrr.write(|w| w.br4().reset());
             }
         });
     }
@@ -100,7 +101,7 @@ impl Indicator for Led0 {
             None => (),
             Some(perip) => {
                 let gpioa = &perip.GPIOA;
-                gpioa.bsrr.write(|w| w.br4().reset());
+                gpioa.bsrr.write(|w| w.bs4().set());
             }
         });
     }
@@ -148,7 +149,7 @@ impl Indicator for Led1 {
             None => (),
             Some(perip) => {
                 let gpioa = &perip.GPIOA;
-                gpioa.bsrr.write(|w| w.bs5().set());
+                gpioa.bsrr.write(|w| w.br5().reset());
             }
         });
     }
@@ -157,7 +158,7 @@ impl Indicator for Led1 {
             None => (),
             Some(perip) => {
                 let gpioa = &perip.GPIOA;
-                gpioa.bsrr.write(|w| w.br5().reset());
+                gpioa.bsrr.write(|w| w.bs5().set());
             }
         });
     }
