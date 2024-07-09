@@ -6,7 +6,7 @@ use core::cell::RefCell;
 use core::fmt::{self, Write};
 use core::time::Duration;
 
-use stm32g0::stm32g030::CorePeripherals;
+use stm32g0::stm32g030::{exti, CorePeripherals};
 use stm32g0::stm32g030::Interrupt;
 use stm32g0::stm32g030::Peripherals;
 use stm32g0::stm32g030::NVIC;
@@ -83,6 +83,84 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
         NVIC::unmask(Interrupt::TIM3);
     }
 }
+
+pub fn exti_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
+
+    // GPIOポートの電源投入(クロックの有効化)
+    perip.RCC.iopenr.modify(|_, w| w.iopaen().set_bit());
+    // gpioモード変更
+    let gpioa = &perip.GPIOA;
+    gpioa.moder.modify(|_, w| w.moder0().input());
+
+    // SYSCFGにクロック供給
+    perip.RCC.apbenr2.modify(|_, w| w.syscfgen().set_bit());
+
+    // rising and falling edge event enable through
+    // – EXTI rising trigger selection register (EXTI_RTSR1)
+    // – EXTI falling trigger selection register 1 (EXTI_FTSR1)
+
+    let exti = &perip.EXTI;
+
+    // PA0
+    exti.exticr1.modify(|_, w| unsafe{ w.exti0_7().pa().bits(1) } );
+    exti.imr1.modify(|_, w| w.im0().set_bit() );
+
+
+    exti.rtsr1.modify(|_, w| w.tr0().enabled() );
+    // exti.ftsr1.modify(|_, w| w.tr0().enabled() );
+
+    // EXTI_RPR1, EXTI_FPR1をチェックして割り込みが起きたか確認すればよい？
+
+    // Target Settings
+    // PA0 EXTI_EXTICR1.EXTI0
+
+    // 割り込み設定
+    unsafe {
+        core_perip.NVIC.set_priority(Interrupt::EXTI0_1, 0);
+        NVIC::unmask(Interrupt::EXTI0_1);
+    }
+
+}
+
+pub fn set_swier() {
+
+    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        None => (),
+        Some(perip) => {
+            let exti = &perip.EXTI;
+            exti.swier1.modify(|_, w| w.swier0().set_bit() );
+        }
+    });
+
+}
+
+pub fn clear_exti() {
+    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        None => (),
+        Some(perip) => {
+            let exti = &perip.EXTI;
+            exti.rpr1.modify(|_, w| w.rpif0().set_bit() );
+        
+        }
+    });
+
+}
+
+
+
+
+pub fn check_status() {
+    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        None => (),
+        Some(perip) => {
+            let itline = &perip.SYSCFG_ITLINE;
+            defmt::info!("itline exti0: {}", itline. itline5.read().exti0().bit());
+        
+        }
+    });
+
+}
+
 
 pub struct Led0 {}
 

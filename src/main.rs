@@ -17,6 +17,7 @@ use cortex_m::interrupt::{free, Mutex};
 use cortex_m_rt::entry;
 
 use stm32g0::stm32g030::interrupt;
+use stm32g0::stm32g030::Interrupt::EXTI0_1;
 
 mod app;
 mod indicator;
@@ -25,6 +26,19 @@ mod rs485_trigger_stm32g0;
 static G_APP: Mutex<
     RefCell<Option<app::App<rs485_trigger_stm32g0::Led0, rs485_trigger_stm32g0::Led1>>>,
 > = Mutex::new(RefCell::new(None));
+
+#[interrupt]
+fn EXTI0_1() {
+    // SYSCFG_ITLINE5でステータスが見れそう
+
+    defmt::error!("error from defmt");
+    defmt::warn!("warn from defmt");
+
+    rs485_trigger_stm32g0::clear_exti()
+
+}
+
+
 
 #[entry]
 fn main() -> ! {
@@ -36,6 +50,7 @@ fn main() -> ! {
     let mut core_perip = stm32g030::CorePeripherals::take().unwrap();
 
     rs485_trigger_stm32g0::clock_init(&perip, &mut core_perip);
+    rs485_trigger_stm32g0::exti_init(&perip, &mut core_perip);
 
     // init g peripheral
     rs485_trigger_stm32g0::init_g_peripheral(perip);
@@ -47,21 +62,6 @@ fn main() -> ! {
     led1.init();
     led1.off();
 
-    // let clock: rs485_trigger_stm32g0::LocalClock = rs485_trigger_stm32g0::LocalClock::new();
-    // clock.init();
-
-    // let app = app::App::new(led0, led1);
-    // free(|cs| G_APP.borrow(cs).replace(Some(app)));
-
-    // loop {
-        // free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
-        //     None => (),
-        //     Some(app) => {
-        //         app.periodic_task();
-        //         defmt::info!("parse uart task finished.");
-        //     }
-        // });
-    // }
 
     let mut t = 0;
     free(
@@ -73,6 +73,9 @@ fn main() -> ! {
         },
     );
     let mut prev = t;
+
+    rs485_trigger_stm32g0::set_swier();
+
     loop {
         free(
             |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
@@ -84,15 +87,13 @@ fn main() -> ! {
         );
 
         if t.wrapping_sub(prev) > 500 {
-            defmt::info!("t: {}", t);
-            defmt::info!("prev: {}", prev);
-    
-            defmt::error!("error from defmt");
-            defmt::warn!("warn from defmt");
-            defmt::info!("info from defmt");
+            // defmt::info!("t: {}", t);
+            // defmt::info!("prev: {}", prev);
 
             led0.toggle();
             led1.toggle();
+            // rs485_trigger_stm32g0::check_status();
+
             prev = t;
         }
     }
