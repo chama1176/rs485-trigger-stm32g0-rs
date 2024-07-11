@@ -74,7 +74,7 @@ fn main() -> ! {
     );
     let mut prev = t;
 
-    rs485_trigger_stm32g0::set_swier();
+    // rs485_trigger_stm32g0::set_swier();
 
     loop {
         free(
@@ -90,8 +90,8 @@ fn main() -> ! {
             // defmt::info!("t: {}", t);
             // defmt::info!("prev: {}", prev);
 
-            led0.toggle();
-            led1.toggle();
+            // led0.toggle();
+            // led1.toggle();
             // rs485_trigger_stm32g0::check_status();
 
             prev = t;

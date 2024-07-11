@@ -102,12 +102,13 @@ pub fn exti_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     let exti = &perip.EXTI;
 
     // PA0
-    exti.exticr1.modify(|_, w| unsafe{ w.exti0_7().pa().bits(1) } );
+    exti.exticr1.modify(|_, w| w.exti0_7().pa() );
     exti.imr1.modify(|_, w| w.im0().set_bit() );
+    // exti.emr1.modify(|_, w| w.em0().set_bit() );
 
 
     exti.rtsr1.modify(|_, w| w.tr0().enabled() );
-    // exti.ftsr1.modify(|_, w| w.tr0().enabled() );
+    exti.ftsr1.modify(|_, w| w.tr0().enabled() );
 
     // EXTI_RPR1, EXTI_FPR1をチェックして割り込みが起きたか確認すればよい？
 
@@ -116,7 +117,7 @@ pub fn exti_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
 
     // 割り込み設定
     unsafe {
-        core_perip.NVIC.set_priority(Interrupt::EXTI0_1, 0);
+        core_perip.NVIC.set_priority(Interrupt::EXTI0_1, 1);
         NVIC::unmask(Interrupt::EXTI0_1);
     }
 
@@ -140,6 +141,7 @@ pub fn clear_exti() {
         Some(perip) => {
             let exti = &perip.EXTI;
             exti.rpr1.modify(|_, w| w.rpif0().set_bit() );
+            exti.fpr1.modify(|_, w| w.fpif0().set_bit() );
         
         }
     });
