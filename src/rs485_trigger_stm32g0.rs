@@ -95,25 +95,20 @@ pub fn exti_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // SYSCFGにクロック供給
     perip.RCC.apbenr2.modify(|_, w| w.syscfgen().set_bit());
 
+    let exti = &perip.EXTI;
+
+    // Target Settings
+    // PA0 EXTI_EXTICR1.EXTI0
+    exti.exticr1.modify(|_, w| w.exti0_7().pa() );
+    exti.imr1.modify(|_, w| w.im0().set_bit() );
+
     // rising and falling edge event enable through
     // – EXTI rising trigger selection register (EXTI_RTSR1)
     // – EXTI falling trigger selection register 1 (EXTI_FTSR1)
-
-    let exti = &perip.EXTI;
-
-    // PA0
-    exti.exticr1.modify(|_, w| w.exti0_7().pa() );
-    exti.imr1.modify(|_, w| w.im0().set_bit() );
-    // exti.emr1.modify(|_, w| w.em0().set_bit() );
-
-
     exti.rtsr1.modify(|_, w| w.tr0().enabled() );
     exti.ftsr1.modify(|_, w| w.tr0().enabled() );
 
     // EXTI_RPR1, EXTI_FPR1をチェックして割り込みが起きたか確認すればよい？
-
-    // Target Settings
-    // PA0 EXTI_EXTICR1.EXTI0
 
     // 割り込み設定
     unsafe {
@@ -148,21 +143,62 @@ pub fn clear_exti() {
 
 }
 
+pub struct TriggerOut0 {}
 
-
-
-pub fn check_status() {
-    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
-        None => (),
-        Some(perip) => {
-            let itline = &perip.SYSCFG_ITLINE;
-            defmt::info!("itline exti0: {}", itline. itline5.read().exti0().bit());
-        
-        }
-    });
-
+impl Indicator for TriggerOut0 {
+    fn on(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.bs6().set());
+            }
+        });
+    }
+    fn off(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                gpioa.bsrr.write(|w| w.br6().reset());
+            }
+        });
+    }
+    fn toggle(&self) {
+        free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+            None => (),
+            Some(perip) => {
+                let gpioa = &perip.GPIOA;
+                if gpioa.odr.read().odr4().is_low() {
+                    gpioa.bsrr.write(|w| w.bs6().set());
+                } else {
+                    gpioa.bsrr.write(|w| w.br6().reset());
+                }
+            }
+        });
+    }
 }
 
+impl TriggerOut0 {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn init(&self) {
+        free(|cs| {
+            match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+                None => (),
+                Some(perip) => {
+                    // GPIOポートの電源投入(クロックの有効化)
+                    perip.RCC.iopenr.modify(|_, w| w.iopaen().set_bit());
+                    // gpioモード変更
+                    let gpioa = &perip.GPIOA;
+                    gpioa.moder.modify(|_, w| w.moder6().output());
+                }
+            }
+        });
+    }
+}
 
 pub struct Led0 {}
 

@@ -61,6 +61,7 @@ fn main() -> ! {
     let led1 = rs485_trigger_stm32g0::Led1::new();
     led1.init();
     led1.off();
+    let trigger_out = rs485_trigger_stm32g0::TriggerOut0::new();
 
 
     let mut t = 0;
@@ -74,8 +75,6 @@ fn main() -> ! {
     );
     let mut prev = t;
 
-    // rs485_trigger_stm32g0::set_swier();
-
     loop {
         free(
             |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
@@ -87,12 +86,9 @@ fn main() -> ! {
         );
 
         if t.wrapping_sub(prev) > 500 {
-            // defmt::info!("t: {}", t);
-            // defmt::info!("prev: {}", prev);
 
-            // led0.toggle();
-            // led1.toggle();
-            // rs485_trigger_stm32g0::check_status();
+            led0.toggle();
+            led1.toggle();
 
             prev = t;
         }
