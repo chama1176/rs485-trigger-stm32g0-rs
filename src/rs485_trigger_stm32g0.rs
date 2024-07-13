@@ -69,6 +69,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // while !perip.RCC.cfgr.read().sws().is_hse() {}
 
     perip.RCC.apbenr1.modify(|_, w| w.tim3en().set_bit());
+    perip.RCC.apbenr2.modify(|_, w| w.tim14en().set_bit());
 
     let tim3 = &perip.TIM3;
     tim3.psc.modify(|_, w| unsafe { w.bits(64_000 - 1) });  // 1kHz
@@ -77,10 +78,19 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     // tim3.dier.modify(|_, w| w.uie().set_bit());
     tim3.cr1.modify(|_, w| w.cen().set_bit());
 
+    let tim14 = &perip.TIM14;
+    tim14.psc.modify(|_, w| unsafe { w.bits(64_000 - 1) });  // 1kHz
+    // tim14.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
+
+    // tim14.dier.modify(|_, w| w.uie().set_bit());
+    tim14.cr1.modify(|_, w| w.cen().set_bit());
+
     // 割り込み設定
     unsafe {
         core_perip.NVIC.set_priority(Interrupt::TIM3, 0);
         NVIC::unmask(Interrupt::TIM3);
+        core_perip.NVIC.set_priority(Interrupt::TIM14, 0);
+        NVIC::unmask(Interrupt::TIM14);
     }
 }
 

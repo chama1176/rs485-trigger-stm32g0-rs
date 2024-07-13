@@ -69,7 +69,8 @@ fn main() -> ! {
         |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
             None => (),
             Some(perip) => {
-                t = perip.TIM3.cnt.read().cnt_l().bits();
+                // t = perip.TIM3.cnt.read().cnt_l().bits();
+                t = perip.TIM14.cnt.read().cnt().bits();
             }
         },
     );
@@ -80,7 +81,8 @@ fn main() -> ! {
             |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
                 None => (),
                 Some(perip) => {
-                    t = perip.TIM3.cnt.read().cnt_l().bits();
+                    // t = perip.TIM3.cnt.read().cnt_l().bits();
+                    t = perip.TIM14.cnt.read().cnt().bits();
                 }
             },
         );
