@@ -18,33 +18,57 @@ use cortex_m_rt::entry;
 
 use stm32g0::stm32g030::interrupt;
 use stm32g0::stm32g030::Interrupt::EXTI0_1;
+use stm32g0::stm32g030::Interrupt::TIM14;
 
 mod app;
 mod indicator;
 mod rs485_trigger_stm32g0;
 
 static G_APP: Mutex<
-    RefCell<Option<app::App<rs485_trigger_stm32g0::Led0, rs485_trigger_stm32g0::Led1>>>,
+    RefCell<
+        Option<
+            app::App<
+                rs485_trigger_stm32g0::Led0,
+                rs485_trigger_stm32g0::Led1,
+                rs485_trigger_stm32g0::TriggerOut0,
+            >,
+        >,
+    >,
 > = Mutex::new(RefCell::new(None));
+
+// 4Mbps = 0.25us = 250ns
+// 0.25 x 8bit(1Byte) x 4? = 8us?
 
 #[interrupt]
 fn EXTI0_1() {
     // SYSCFG_ITLINE5でステータスが見れそう
-
-    defmt::error!("error from defmt");
     defmt::warn!("warn from defmt");
 
     rs485_trigger_stm32g0::clear_exti();
 
-    // URS=1にしてUGを呼べばカウンターをリセットできそう
-
-
-
+    let tim = rs485_trigger_stm32g0::Tim14::new();
+    tim.start();
+    tim.reset_cnt();
 }
 
-// TIM14割り込み
-// UIFをクリアする
+#[interrupt]
+fn TIM14() {
+    // TIM14割り込み
 
+    let tim = rs485_trigger_stm32g0::Tim14::new();
+    // UIFをクリアする
+    tim.clear_uif();
+
+    free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
+        None => (),
+        Some(app) => {
+            app.toggle_trigger_out();
+            defmt::info!("toggle");
+        }
+    });
+
+    tim.stop();
+}
 
 #[entry]
 fn main() -> ! {
@@ -69,34 +93,47 @@ fn main() -> ! {
     led1.off();
     let trigger_out = rs485_trigger_stm32g0::TriggerOut0::new();
 
+    let app = app::App::new(led0, led1, trigger_out);
+    free(|cs| G_APP.borrow(cs).replace(Some(app)));
 
     let mut t = 0;
-    free(
-        |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+    free(|cs| {
+        match rs485_trigger_stm32g0::G_PERIPHERAL
+            .borrow(cs)
+            .borrow()
+            .as_ref()
+        {
             None => (),
             Some(perip) => {
                 // t = perip.TIM3.cnt.read().cnt_l().bits();
                 t = perip.TIM14.cnt.read().cnt().bits();
             }
-        },
-    );
+        }
+    });
     let mut prev = t;
 
     loop {
-        free(
-            |cs| match rs485_trigger_stm32g0::G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        free(|cs| {
+            match rs485_trigger_stm32g0::G_PERIPHERAL
+                .borrow(cs)
+                .borrow()
+                .as_ref()
+            {
                 None => (),
                 Some(perip) => {
                     // t = perip.TIM3.cnt.read().cnt_l().bits();
                     t = perip.TIM14.cnt.read().cnt().bits();
                 }
-            },
-        );
+            }
+        });
 
         if t.wrapping_sub(prev) > 500 {
-
-            led0.toggle();
-            led1.toggle();
+            free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
+                None => (),
+                Some(app) => {
+                    app.periodic_task();
+                }
+            });
 
             prev = t;
         }
