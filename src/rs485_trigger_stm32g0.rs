@@ -82,8 +82,11 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     tim14.psc.modify(|_, w| unsafe { w.bits(64_000 - 1) });  // 1kHz
     // tim14.arr.modify(|_, w| unsafe { w.bits(1000 - 1) });    // 1kHz
 
+    // ARPE
+    // UDIS
     // tim14.dier.modify(|_, w| w.uie().set_bit());
     tim14.cr1.modify(|_, w| w.cen().set_bit());
+
 
     // 割り込み設定
     unsafe {

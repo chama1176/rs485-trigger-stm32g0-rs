@@ -34,10 +34,16 @@ fn EXTI0_1() {
     defmt::error!("error from defmt");
     defmt::warn!("warn from defmt");
 
-    rs485_trigger_stm32g0::clear_exti()
+    rs485_trigger_stm32g0::clear_exti();
+
+    // URS=1にしてUGを呼べばカウンターをリセットできそう
+
+
 
 }
 
+// TIM14割り込み
+// UIFをクリアする
 
 
 #[entry]
