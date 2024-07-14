@@ -92,7 +92,7 @@ pub fn clock_init(perip: &Peripherals, core_perip: &mut CorePeripherals) {
     unsafe {
         core_perip.NVIC.set_priority(Interrupt::TIM3, 0);
         NVIC::unmask(Interrupt::TIM3);
-        core_perip.NVIC.set_priority(Interrupt::TIM14, 0);
+        core_perip.NVIC.set_priority(Interrupt::TIM14, 2);
         NVIC::unmask(Interrupt::TIM14);
     }
 }
@@ -149,6 +149,49 @@ pub fn clear_exti() {
         }
     });
 }
+
+pub fn external_input_interrupt_task() {
+    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        None => (),
+        Some(perip) => {
+            // 高速化のためにべた書きする
+
+            let exti = &perip.EXTI;
+            // Clear exti
+            exti.rpr1.modify(|_, w| w.rpif0().set_bit());
+            exti.fpr1.modify(|_, w| w.fpif0().set_bit());
+
+            let tim14 = &perip.TIM14;
+            // Start TIM14
+            tim14.cr1.modify(|_, w| w.cen().set_bit());
+            // Reset TIM14 Count
+            tim14.egr.write(|w| w.ug().set_bit());
+        }
+    });
+}
+
+pub fn timer_interrupt_task() {
+    free(|cs| match G_PERIPHERAL.borrow(cs).borrow().as_ref() {
+        None => (),
+        Some(perip) => {
+            // 高速化のためにべた書きする
+
+            let tim14 = &perip.TIM14;
+            // Stop TIM14
+            tim14.cr1.modify(|_, w| w.cen().clear_bit());
+            // Clear tif
+            tim14.sr.modify(|_, w| w.uif().clear_bit());
+            // Toggle trigger out
+            let gpioa = &perip.GPIOA;
+            if gpioa.odr.read().odr6().is_low() {
+                gpioa.bsrr.write(|w| w.bs6().set());
+            } else {
+                gpioa.bsrr.write(|w| w.br6().reset());
+            }
+        }
+    });
+}
+
 
 pub struct Tim14 {}
 
@@ -224,7 +267,7 @@ impl Indicator for TriggerOut0 {
             None => (),
             Some(perip) => {
                 let gpioa = &perip.GPIOA;
-                if gpioa.odr.read().odr4().is_low() {
+                if gpioa.odr.read().odr6().is_low() {
                     gpioa.bsrr.write(|w| w.bs6().set());
                 } else {
                     gpioa.bsrr.write(|w| w.br6().reset());

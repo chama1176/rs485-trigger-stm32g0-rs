@@ -42,32 +42,14 @@ static G_APP: Mutex<
 #[interrupt]
 fn EXTI0_1() {
     // SYSCFG_ITLINE5でステータスが見れそう
-    defmt::warn!("warn from defmt");
-
-    rs485_trigger_stm32g0::clear_exti();
-
-    let tim = rs485_trigger_stm32g0::Tim14::new();
-    tim.start();
-    tim.reset_cnt();
+    rs485_trigger_stm32g0::external_input_interrupt_task();
+    // defmt::warn!("exti");
 }
 
 #[interrupt]
 fn TIM14() {
-    // TIM14割り込み
-
-    let tim = rs485_trigger_stm32g0::Tim14::new();
-    // UIFをクリアする
-    tim.clear_uif();
-
-    free(|cs| match G_APP.borrow(cs).borrow_mut().deref_mut() {
-        None => (),
-        Some(app) => {
-            app.toggle_trigger_out();
-            defmt::info!("toggle");
-        }
-    });
-
-    tim.stop();
+    rs485_trigger_stm32g0::timer_interrupt_task();
+    // defmt::error!("toggle");
 }
 
 #[entry]
@@ -92,6 +74,8 @@ fn main() -> ! {
     led1.init();
     led1.off();
     let trigger_out = rs485_trigger_stm32g0::TriggerOut0::new();
+    trigger_out.init();
+    trigger_out.off();
 
     let app = app::App::new(led0, led1, trigger_out);
     free(|cs| G_APP.borrow(cs).replace(Some(app)));
@@ -105,8 +89,8 @@ fn main() -> ! {
         {
             None => (),
             Some(perip) => {
-                // t = perip.TIM3.cnt.read().cnt_l().bits();
-                t = perip.TIM14.cnt.read().cnt().bits();
+                t = perip.TIM3.cnt.read().cnt_l().bits();
+                // t = perip.TIM14.cnt.read().cnt().bits();
             }
         }
     });
@@ -121,8 +105,8 @@ fn main() -> ! {
             {
                 None => (),
                 Some(perip) => {
-                    // t = perip.TIM3.cnt.read().cnt_l().bits();
-                    t = perip.TIM14.cnt.read().cnt().bits();
+                    t = perip.TIM3.cnt.read().cnt_l().bits();
+                    // t = perip.TIM14.cnt.read().cnt().bits();
                 }
             }
         });
